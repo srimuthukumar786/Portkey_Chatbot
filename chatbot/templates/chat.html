@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Portkey AI Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; }
+        textarea { width: 100%; height: 100px; }
+        .response { margin-top: 20px; padding: 15px; border: 1px solid #ccc; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Portkey AI Chat</h1>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="model" class="form-label">Select Model:</label>
+            <select id="model" name="model" class="form-select">
+            {% for value, label in models %}
+                <option value="{{ value }}" {% if value == selected_model %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            </select>
+        </div>
+        <textarea name="query" placeholder="Type your message here..." required>{{ request.POST.query }}</textarea><br><br>
+        <button type="submit">Send</button>
+    </form>
+
+    {% if response %}
+        <div class="response">
+            <strong>AI Response:</strong>
+            <p>{{ response }}</p>
+        </div>
+    {% endif %}
+</body>
+</html>

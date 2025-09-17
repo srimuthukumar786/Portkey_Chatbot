@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LLM Analytics Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="container mt-4">
+  <h2 class="mb-4">LLM Analytics Dashboard</h2>
+
+  <!-- Overview Cards -->
+  <div class="row text-center mb-4">
+    <div class="col-md-2"><div class="card p-3">Cost <h4>${{ total_cost }}</h4></div></div>
+    <div class="col-md-2"><div class="card p-3">Tokens <h4>{{ total_tokens }}</h4></div></div>
+    <div class="col-md-2"><div class="card p-3">Requests <h4>{{ total_requests }}</h4></div></div>
+    <div class="col-md-2"><div class="card p-3">Users <h4>{{ unique_users }}</h4></div></div>
+    <div class="col-md-2"><div class="card p-3">Latency <h4>{{ avg_latency }} ms</h4></div></div>
+    <div class="col-md-2"><div class="card p-3">Errors <h4>{{ errors }}</h4></div></div>
+  </div>
+
+  <!-- Time-based Charts -->
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <h5 class="text-center">Cost Over Time</h5>
+      <canvas id="costChart"></canvas>
+    </div>
+    <div class="col-md-6 mb-4">
+      <h5 class="text-center">Tokens Usage Over Time</h5>
+      <canvas id="tokensChart"></canvas>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <h5 class="text-center">Requests Over Time</h5>
+      <canvas id="requestsChart"></canvas>
+    </div>
+    <div class="col-md-6 mb-4">
+      <h5 class="text-center">Average Latency</h5>
+      <canvas id="latencyChart"></canvas>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <h5 class="text-center">Unique Users Over Time</h5>
+      <canvas id="uniqueUsersChart"></canvas>
+    </div>
+    <div class="col-md-6 mb-4">
+      <h5 class="text-center">Model Usage Distribution</h5>
+      <canvas id="modelUsageChart"></canvas>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <h5 class="text-center">Provider Usage Distribution</h5>
+      <canvas id="providerUsageChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+const rawData = JSON.parse('{{ time_series_json|escapejs }}');
+const modelUsage = JSON.parse('{{ model_usage_json|escapejs }}');
+const providerUsage = JSON.parse('{{ provider_usage_json|escapejs }}');
+
+const labels = rawData.map(d => new Date(d.hour).toLocaleString());
+const requestsData = rawData.map(d => d.requests);
+const tokensData = rawData.map(d => d.tokens);
+const costData = rawData.map(d => d.cost);
+const latencyData = rawData.map(d => d.latency);
+const uniqueUsersData = rawData.map(d => d.unique_users);
+
+// Chart helpers
+function renderBarChart(canvasId, label, data, color) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label, data, backgroundColor: color }] },
+    options: { responsive: true, plugins: { legend: { display: true } } }
+  });
+}
+function renderLineChart(canvasId, label, data, color) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: [{ label, data, borderColor: color, fill: false }] },
+    options: { responsive: true, plugins: { legend: { display: true } } }
+  });
+}
+function renderPieChart(canvasId, label, raw, labelKey="model_name") {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: raw.map(d => d[labelKey] || "Unknown"),
+      datasets: [{ label, data: raw.map(d => d.requests),
+        backgroundColor: ["#007bff","#28a745","#ffc107","#dc3545","#6f42c1","#20c997"] }]
+    },
+    options: { responsive: true }
+  });
+}
+
+// Render charts
+renderBarChart('costChart', 'Cost ($)', costData, 'orange');
+renderBarChart('tokensChart', 'Tokens Used', tokensData, 'green');
+renderBarChart('requestsChart', 'Requests', requestsData, 'blue');
+renderLineChart('latencyChart', 'Avg Latency (ms)', latencyData, 'red');
+renderLineChart('uniqueUsersChart', 'Unique Users', uniqueUsersData, 'purple');
+renderPieChart('modelUsageChart', 'Requests per Model', modelUsage, "model_name");
+renderPieChart('providerUsageChart', 'Requests per Provider', providerUsage, "provider");
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
