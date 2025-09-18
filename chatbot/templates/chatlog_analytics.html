@@ -5,110 +5,238 @@
   <title>LLM Analytics Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .chart-container {
+      position: relative;
+      height: 280px;   /* reduced height */
+      width: 100%;
+    }
+  </style>
 </head>
 <body>
 <div class="container mt-4">
   <h2 class="mb-4">LLM Analytics Dashboard</h2>
 
-  <!-- Overview Cards -->
-  <div class="row text-center mb-4">
-    <div class="col-md-2"><div class="card p-3">Cost <h4>${{ total_cost }}</h4></div></div>
-    <div class="col-md-2"><div class="card p-3">Tokens <h4>{{ total_tokens }}</h4></div></div>
-    <div class="col-md-2"><div class="card p-3">Requests <h4>{{ total_requests }}</h4></div></div>
-    <div class="col-md-2"><div class="card p-3">Users <h4>{{ unique_users }}</h4></div></div>
-    <div class="col-md-2"><div class="card p-3">Latency <h4>{{ avg_latency }} ms</h4></div></div>
-    <div class="col-md-2"><div class="card p-3">Errors <h4>{{ errors }}</h4></div></div>
-  </div>
+  <!-- Tabs -->
+  <ul class="nav nav-tabs" id="analyticsTabs" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#overview">Overview</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#users">Users</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#errors">Errors</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#cache">Cache</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#feedback">Feedback</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#metadata">Metadata</button></li>
+  </ul>
 
-  <!-- Time-based Charts -->
-  <div class="row">
-    <div class="col-md-6 mb-4">
-      <h5 class="text-center">Cost Over Time</h5>
-      <canvas id="costChart"></canvas>
+  <!-- Tab Content -->
+  <div class="tab-content mt-3">
+    <!-- Overview -->
+    <div class="tab-pane fade show active" id="overview">
+      <div class="row text-center mb-4">
+        <div class="col"><div class="card p-3">Cost <h4>${{ total_cost }}</h4></div></div>
+        <div class="col"><div class="card p-3">Tokens <h4>{{ total_tokens }}</h4></div></div>
+        <div class="col"><div class="card p-3">Requests <h4>{{ total_requests }}</h4></div></div>
+        <div class="col"><div class="card p-3">Users <h4>{{ unique_users }}</h4></div></div>
+        <div class="col"><div class="card p-3">Latency <h4>{{ avg_latency }} ms</h4></div></div>
+        <div class="col"><div class="card p-3">Errors <h4>{{ errors }}</h4></div></div>
+      </div>
+      <div class="row">
+        <div class="col-md-6"><div class="chart-container"><canvas id="costChart"></canvas></div></div>
+        <div class="col-md-6"><div class="chart-container"><canvas id="tokensChart"></canvas></div></div>
+      </div>
+      <div class="row mt-4">
+        <div class="col-md-6"><div class="chart-container"><canvas id="requestsChart"></canvas></div></div>
+        <div class="col-md-6"><div class="chart-container"><canvas id="latencyChart"></canvas></div></div>
+      </div>
+      <div class="row mt-4">
+        <div class="col-md-6"><div class="chart-container"><canvas id="uniqueUsersChart"></canvas></div></div>
+        <div class="col-md-6"><div class="chart-container"><canvas id="modelUsageChart"></canvas></div></div>
+      </div>
+      <div class="row mt-4">
+        <div class="col-md-6"><div class="chart-container"><canvas id="providerUsageChart"></canvas></div></div>
+      </div>
     </div>
-    <div class="col-md-6 mb-4">
-      <h5 class="text-center">Tokens Usage Over Time</h5>
-      <canvas id="tokensChart"></canvas>
+
+    <!-- Users -->
+    <div class="tab-pane fade" id="users">
+      <h5>Requests & Cost per User</h5>
+      <div class="chart-container"><canvas id="userRequestsChart"></canvas></div>
     </div>
-  </div>
-  <div class="row">
-    <div class="col-md-6 mb-4">
-      <h5 class="text-center">Requests Over Time</h5>
-      <canvas id="requestsChart"></canvas>
+
+    <!-- Errors -->
+    <div class="tab-pane fade" id="errors">
+      <h5>Error Rate Over Time</h5>
+      <div class="chart-container"><canvas id="errorRateChart"></canvas></div>
+
+      <h5 class="mt-4">Errors per Provider</h5>
+      <div class="chart-container"><canvas id="errorProviderChart"></canvas></div>
+
+      <h5 class="mt-4">Error Types</h5>
+      <div class="chart-container"><canvas id="errorTypesChart"></canvas></div>
     </div>
-    <div class="col-md-6 mb-4">
-      <h5 class="text-center">Average Latency</h5>
-      <canvas id="latencyChart"></canvas>
+
+    <!-- Cache -->
+    <div class="tab-pane fade" id="cache">
+      <h5>Cache Hits & Savings</h5>
+      <div class="chart-container"><canvas id="cacheHitsChart"></canvas></div>
     </div>
-  </div>
-  <div class="row">
-    <div class="col-md-6 mb-4">
-      <h5 class="text-center">Unique Users Over Time</h5>
-      <canvas id="uniqueUsersChart"></canvas>
+
+    <!-- Feedback -->
+    <div class="tab-pane fade" id="feedback">
+      <h5>Feedback Trend</h5>
+      <div class="chart-container"><canvas id="feedbackChart"></canvas></div>
     </div>
-    <div class="col-md-6 mb-4">
-      <h5 class="text-center">Model Usage Distribution</h5>
-      <canvas id="modelUsageChart"></canvas>
-    </div>
-  </div>
-  <div class="row">
-    <div class="col-md-6 mb-4">
-      <h5 class="text-center">Provider Usage Distribution</h5>
-      <canvas id="providerUsageChart"></canvas>
+
+    <!-- Metadata -->
+    <div class="tab-pane fade" id="metadata">
+      <h5>Models & Providers Distribution</h5>
+      <div class="row">
+        <div class="col-md-6"><div class="chart-container"><canvas id="modelUsageMetaChart"></canvas></div></div>
+        <div class="col-md-6"><div class="chart-container"><canvas id="providerUsageMetaChart"></canvas></div></div>
+      </div>
     </div>
   </div>
 </div>
 
+<!-- Chart.js Scripts -->
 <script>
-const rawData = JSON.parse('{{ time_series_json|escapejs }}');
-const modelUsage = JSON.parse('{{ model_usage_json|escapejs }}');
-const providerUsage = JSON.parse('{{ provider_usage_json|escapejs }}');
+document.addEventListener('DOMContentLoaded', function () {
+  // parse safely with fallbacks
+  let timeSeries = [];
+  let userUsage = [];
+  let modelUsage = [];
+  let providerUsage = [];
+  let errorUsage = [];
+  let feedback = [];
+  let errorTypes = [];
 
-const labels = rawData.map(d => new Date(d.hour).toLocaleString());
-const requestsData = rawData.map(d => d.requests);
-const tokensData = rawData.map(d => d.tokens);
-const costData = rawData.map(d => d.cost);
-const latencyData = rawData.map(d => d.latency);
-const uniqueUsersData = rawData.map(d => d.unique_users);
+  try { timeSeries = JSON.parse('{{ time_series_json|escapejs }}') || []; } catch(e){ console.error(e); }
+  try { userUsage = JSON.parse('{{ user_usage_json|escapejs }}') || []; } catch(e){ console.error(e); }
+  try { modelUsage = JSON.parse('{{ model_usage_json|escapejs }}') || []; } catch(e){ console.error(e); }
+  try { providerUsage = JSON.parse('{{ provider_usage_json|escapejs }}') || []; } catch(e){ console.error(e); }
+  try { errorUsage = JSON.parse('{{ error_usage_json|escapejs }}') || []; } catch(e){ /* optional */ }
+  try { feedback = JSON.parse('{{ feedback_json|escapejs }}') || []; } catch(e){ /* optional */ }
+  try { errorTypes = JSON.parse('{{ error_types_json|escapejs }}') || []; } catch(e){ /* optional */ }
 
-// Chart helpers
-function renderBarChart(canvasId, label, data, color) {
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets: [{ label, data, backgroundColor: color }] },
-    options: { responsive: true, plugins: { legend: { display: true } } }
+  const labels = timeSeries.map(d => {
+    try { return new Date(d.hour).toLocaleString(); } catch(_) { return d.hour || ''; }
   });
-}
-function renderLineChart(canvasId, label, data, color) {
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets: [{ label, data, borderColor: color, fill: false }] },
-    options: { responsive: true, plugins: { legend: { display: true } } }
-  });
-}
-function renderPieChart(canvasId, label, raw, labelKey="model_name") {
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  new Chart(ctx, {
+
+  const defaultOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: true } },
+    scales: { x: { beginAtZero: true }, y: { beginAtZero: true } }
+  };
+
+  // helper to create bar chart (single dataset)
+  function createBarChartById(id, labelsArr, dataArr, labelText, bg) {
+    return new Chart(document.getElementById(id), {
+      type: 'bar',
+      data: { labels: labelsArr, datasets: [{ label: labelText, data: dataArr, backgroundColor: bg }] },
+      options: defaultOptions
+    });
+  }
+
+  // --- Overview charts ---
+  createBarChartById('costChart', labels, timeSeries.map(d => Number(d.cost) || 0), 'Cost ($)', 'orange');
+  createBarChartById('tokensChart', labels, timeSeries.map(d => Number(d.tokens) || 0), 'Tokens Used', 'green');
+  createBarChartById('requestsChart', labels, timeSeries.map(d => Number(d.requests) || 0), 'Requests', 'blue');
+  createBarChartById('latencyChart', labels, timeSeries.map(d => Number(d.latency) || 0), 'Avg Latency (ms)', 'red');
+  createBarChartById('uniqueUsersChart', labels, timeSeries.map(d => Number(d.unique_users) || 0), 'Unique Users', 'purple');
+
+  // model usage = pie
+  new Chart(document.getElementById('modelUsageChart'), {
     type: 'pie',
     data: {
-      labels: raw.map(d => d[labelKey] || "Unknown"),
-      datasets: [{ label, data: raw.map(d => d.requests),
-        backgroundColor: ["#007bff","#28a745","#ffc107","#dc3545","#6f42c1","#20c997"] }]
+      labels: modelUsage.map(d => d.model_name || 'Unknown'),
+      datasets: [{ data: modelUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#007bff","#28a745","#ffc107","#dc3545","#6f42c1","#20c997"] }]
     },
-    options: { responsive: true }
+    options: { responsive: true, maintainAspectRatio: false }
   });
-}
 
-// Render charts
-renderBarChart('costChart', 'Cost ($)', costData, 'orange');
-renderBarChart('tokensChart', 'Tokens Used', tokensData, 'green');
-renderBarChart('requestsChart', 'Requests', requestsData, 'blue');
-renderLineChart('latencyChart', 'Avg Latency (ms)', latencyData, 'red');
-renderLineChart('uniqueUsersChart', 'Unique Users', uniqueUsersData, 'purple');
-renderPieChart('modelUsageChart', 'Requests per Model', modelUsage, "model_name");
-renderPieChart('providerUsageChart', 'Requests per Provider', providerUsage, "provider");
+  // provider usage = pie
+  new Chart(document.getElementById('providerUsageChart'), {
+    type: 'pie',
+    data: {
+      labels: providerUsage.map(d => d.provider || 'Unknown'),
+      datasets: [{ data: providerUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#17a2b8","#6c757d","#20c997","#fd7e14","#6f42c1"] }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // --- Users tab ---
+  new Chart(document.getElementById('userRequestsChart'), {
+    type: 'bar',
+    data: {
+      labels: userUsage.map(u => u.user__username || 'Unknown'),
+      datasets: [
+        { label: 'Requests', data: userUsage.map(u => Number(u.requests) || 0), backgroundColor: 'teal' },
+        { label: 'Cost ($)', data: userUsage.map(u => Number(u.cost) || 0), backgroundColor: 'orange' }
+      ]
+    },
+    options: Object.assign({}, defaultOptions, { indexAxis: 'y' })
+  });
+
+  // --- Errors: rate ---
+  const errorRateData = timeSeries.map(d => {
+    const req = Number(d.requests) || 0;
+    const err = Number(d.errors) || 0;
+    return req > 0 ? Number(((err / req) * 100).toFixed(2)) : 0;
+  });
+  createBarChartById('errorRateChart', labels, errorRateData, 'Error Rate %', 'red');
+
+  // --- Errors: provider ---
+  new Chart(document.getElementById('errorProviderChart'), {
+    type: 'bar',
+    data: { labels: errorUsage.map(e => e.provider || 'Unknown'), datasets: [{ label: 'Errors', data: errorUsage.map(e => Number(e.errors) || 0), backgroundColor: 'crimson' }] },
+    options: Object.assign({}, defaultOptions, { indexAxis: errorUsage.length > 6 ? 'y' : 'x' })
+  });
+
+  // --- Errors: types (PIE CHART) ---
+  (function renderErrorTypes() {
+    const ctx = document.getElementById('errorTypesChart');
+    if (!errorTypes || errorTypes.length === 0) {
+      new Chart(ctx, {
+        type: 'pie',
+        data: { labels: ['No errors'], datasets: [{ data: [0], backgroundColor: ['#ddd'] }] }
+      });
+      return;
+    }
+
+    const labelsErr = errorTypes.map(e => e.error_message || 'Unknown');
+    const countsErr = errorTypes.map(e => Number(e.count) || 0);
+    const palette = ["#ff6384","#36a2eb","#ffce56","#9966ff","#ff9f40","#6f42c1","#20c997","#fd7e14"];
+    const bgColors = countsErr.map((_, i) => palette[i % palette.length]);
+
+    new Chart(ctx, {
+      type: 'pie',
+      data: { labels: labelsErr, datasets: [{ data: countsErr, backgroundColor: bgColors }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  })();
+
+  // --- Cache ---
+  createBarChartById('cacheHitsChart', labels, timeSeries.map(d => Number(d.cache_hits) || 0), 'Cache Hits', 'purple');
+
+  // --- Feedback ---
+  createBarChartById('feedbackChart', feedback.map(d => {
+    try { return new Date(d.hour).toLocaleString(); } catch(_) { return d.hour || ''; }
+  }), feedback.map(d => Number(d.avg_feedback) || 0), 'Avg Feedback', 'blue');
+
+  // --- Metadata ---
+  new Chart(document.getElementById('modelUsageMetaChart'), {
+    type: 'doughnut',
+    data: { labels: modelUsage.map(d => d.model_name || 'Unknown'), datasets: [{ data: modelUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#007bff","#28a745","#ffc107","#dc3545","#6f42c1"] }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  new Chart(document.getElementById('providerUsageMetaChart'), {
+    type: 'doughnut',
+    data: { labels: providerUsage.map(d => d.provider || 'Unknown'), datasets: [{ data: providerUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#17a2b8","#6c757d","#20c997","#fd7e14"] }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+}); // DOMContentLoaded
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

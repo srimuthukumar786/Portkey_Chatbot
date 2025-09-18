@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from .models import ChatLog
-from django.db.models import Count, Sum, Avg
+from django.db.models import Count, Sum, Avg, Q
 from django.db.models.functions import TruncHour
 import time
 from .utils import client, get_available_models, get_provider
@@ -100,58 +100,98 @@ def chat_view(request):
     return render(request, "chat.html", context)
 
 
+import json
+from django.shortcuts import render
+from django.db.models import Count, Sum, Avg, Q
+from django.db.models.functions import TruncHour
+from django.core.serializers.json import DjangoJSONEncoder
+from .models import ChatLog
+
 def analytics_view(request):
-    # Overview stats
+    # --- Overview metrics ---
     total_cost = ChatLog.objects.aggregate(total=Sum("cost"))["total"] or 0
     total_tokens = ChatLog.objects.aggregate(total=Sum("tokens_used"))["total"] or 0
     total_requests = ChatLog.objects.count()
     unique_users = ChatLog.objects.values("user_id").distinct().count()
     avg_latency = ChatLog.objects.aggregate(avg=Avg("latency"))["avg"] or 0
-    errors = ChatLog.objects.filter(status="error").count()
+    errors = ChatLog.objects.filter(~Q(error_message__isnull=True)).count()
 
-    # Requests per model
-    model_usage = list(
-        ChatLog.objects.values("model_name")
-        .annotate(requests=Count("id"))
-        .order_by("-requests")
-    )
-
-    # Requests per provider
-    provider_usage = list(
-        ChatLog.objects.values("provider")
-        .annotate(requests=Count("id"))
-        .order_by("-requests")
-    )
-
-    # Requests per user
+    # --- Requests per user ---
     user_usage = list(
         ChatLog.objects.values("user__username")
         .annotate(requests=Count("id"), cost=Sum("cost"))
         .order_by("-requests")
     )
 
-    # Time-series (hourly)
-    time_series = ChatLog.objects.annotate(hour=TruncHour("timestamp")).values(
-        "hour"
-    ).annotate(
-        requests=Count("id"),
-        tokens=Sum("tokens_used"),
-        cost=Sum("cost"),
-        latency=Avg("latency"),
-        unique_users=Count("user_id", distinct=True),
-    ).order_by("hour")
+    # --- Requests per model ---
+    model_usage = list(
+        ChatLog.objects.values("model_name")
+        .annotate(requests=Count("id"))
+        .order_by("-requests")
+    )
+
+    # --- Requests per provider ---
+    provider_usage = list(
+        ChatLog.objects.values("provider")
+        .annotate(requests=Count("id"))
+        .order_by("-requests")
+    )
+
+    # --- Errors per provider ---
+    error_usage = list(
+        ChatLog.objects.filter(~Q(error_message__isnull=True))
+        .values("provider")
+        .annotate(errors=Count("id"))
+        .order_by("-errors")
+    )
+
+    # --- Error types distribution ---
+    error_types = list(
+        ChatLog.objects.filter(~Q(error_message__isnull=True))
+        .values("error_message")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+    )
+
+    # --- Feedback trend (assuming response_text stores rating somewhere or extra model) ---
+    feedback_trend = (
+        ChatLog.objects.annotate(hour=TruncHour("timestamp"))
+        .values("hour")
+        .annotate(avg_feedback=Avg("latency"))  # ⚠ replace with feedback field if exists
+        .order_by("hour")
+    )
+
+    # --- Time-series (hourly stats) ---
+    time_series = (
+        ChatLog.objects.annotate(hour=TruncHour("timestamp"))
+        .values("hour")
+        .annotate(
+            requests=Count("id"),
+            errors=Count("id", filter=~Q(error_message__isnull=True)),
+            tokens=Sum("tokens_used"),
+            cost=Sum("cost"),
+            latency=Avg("latency"),
+            unique_users=Count("user_id", distinct=True),
+        )
+        .order_by("hour")
+    )
 
     context = {
+        # Summary
         "total_cost": round(total_cost, 4),
         "total_tokens": total_tokens,
         "total_requests": total_requests,
         "unique_users": unique_users,
         "avg_latency": round(avg_latency, 2),
         "errors": errors,
-        # ✅ Pass JSON-safe data
+
+        # JSON dumps for charts
         "time_series_json": json.dumps(list(time_series), cls=DjangoJSONEncoder),
+        "user_usage_json": json.dumps(list(user_usage), cls=DjangoJSONEncoder),
         "model_usage_json": json.dumps(list(model_usage), cls=DjangoJSONEncoder),
         "provider_usage_json": json.dumps(list(provider_usage), cls=DjangoJSONEncoder),
-        "user_usage_json": json.dumps(list(user_usage), cls=DjangoJSONEncoder),
+        "error_usage_json": json.dumps(list(error_usage), cls=DjangoJSONEncoder),
+        "error_types_json": json.dumps(list(error_types), cls=DjangoJSONEncoder), 
+        "feedback_json": json.dumps(list(feedback_trend), cls=DjangoJSONEncoder),
     }
     return render(request, "chatlog_analytics.html", context)
