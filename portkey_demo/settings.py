@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 
-PORTKEY_API_KEY = os.environ.get("PORTKEY_API_KEY", "**********************")
+PORTKEY_API_KEY = os.environ.get("PORTKEY_API_KEY", "5dKQcKONU1JRHbxEowzBh9a1GHzd")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

@@ -8,7 +8,7 @@
   <style>
     .chart-container {
       position: relative;
-      height: 280px;   /* reduced height */
+      height: 280px;
       width: 100%;
     }
   </style>
@@ -16,6 +16,32 @@
 <body>
 <div class="container mt-4">
   <h2 class="mb-4">LLM Analytics Dashboard</h2>
+
+  <!-- Filter Form -->
+  <div class="card p-3 mb-4">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label for="userFilter" class="form-label">User</label>
+        <select class="form-select" id="userFilter" name="user">
+          <option value="">All Users</option>
+          {% for user in all_users %}
+            <option value="{{ user }}" {% if user == selected_user %}selected{% endif %}>{{ user }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="startDate" class="form-label">Start Date</label>
+        <input type="date" class="form-control" id="startDate" name="start_date" value="{{ start_date }}">
+      </div>
+      <div class="col-md-3">
+        <label for="endDate" class="form-label">End Date</label>
+        <input type="date" class="form-control" id="endDate" name="end_date" value="{{ end_date }}">
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100">Apply Filters</button>
+      </div>
+    </form>
+  </div>
 
   <!-- Tabs -->
   <ul class="nav nav-tabs" id="analyticsTabs" role="tablist">
@@ -59,7 +85,9 @@
     <!-- Users -->
     <div class="tab-pane fade" id="users">
       <h5>Requests & Cost per User</h5>
-      <div class="chart-container"><canvas id="userRequestsChart"></canvas></div>
+      <div class="chart-container">
+        <canvas id="userRequestsChart"></canvas>
+      </div>
     </div>
 
     <!-- Errors -->
@@ -100,14 +128,7 @@
 <!-- Chart.js Scripts -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // parse safely with fallbacks
-  let timeSeries = [];
-  let userUsage = [];
-  let modelUsage = [];
-  let providerUsage = [];
-  let errorUsage = [];
-  let feedback = [];
-  let errorTypes = [];
+  let timeSeries = [], userUsage = [], modelUsage = [], providerUsage = [], errorUsage = [], feedback = [], errorTypes = [];
 
   try { timeSeries = JSON.parse('{{ time_series_json|escapejs }}') || []; } catch(e){ console.error(e); }
   try { userUsage = JSON.parse('{{ user_usage_json|escapejs }}') || []; } catch(e){ console.error(e); }
@@ -117,126 +138,56 @@ document.addEventListener('DOMContentLoaded', function () {
   try { feedback = JSON.parse('{{ feedback_json|escapejs }}') || []; } catch(e){ /* optional */ }
   try { errorTypes = JSON.parse('{{ error_types_json|escapejs }}') || []; } catch(e){ /* optional */ }
 
-  const labels = timeSeries.map(d => {
-    try { return new Date(d.hour).toLocaleString(); } catch(_) { return d.hour || ''; }
-  });
+  const labels = timeSeries.map(d => { try { return new Date(d.hour).toLocaleString(); } catch(_) { return d.hour || ''; } });
+  const defaultOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { x: { beginAtZero: true }, y: { beginAtZero: true } } };
 
-  const defaultOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: true } },
-    scales: { x: { beginAtZero: true }, y: { beginAtZero: true } }
-  };
-
-  // helper to create bar chart (single dataset)
   function createBarChartById(id, labelsArr, dataArr, labelText, bg) {
-    return new Chart(document.getElementById(id), {
-      type: 'bar',
-      data: { labels: labelsArr, datasets: [{ label: labelText, data: dataArr, backgroundColor: bg }] },
-      options: defaultOptions
-    });
+    return new Chart(document.getElementById(id), { type: 'bar', data: { labels: labelsArr, datasets: [{ label: labelText, data: dataArr, backgroundColor: bg }] }, options: defaultOptions });
   }
 
-  // --- Overview charts ---
+  // Overview charts
   createBarChartById('costChart', labels, timeSeries.map(d => Number(d.cost) || 0), 'Cost ($)', 'orange');
   createBarChartById('tokensChart', labels, timeSeries.map(d => Number(d.tokens) || 0), 'Tokens Used', 'green');
   createBarChartById('requestsChart', labels, timeSeries.map(d => Number(d.requests) || 0), 'Requests', 'blue');
   createBarChartById('latencyChart', labels, timeSeries.map(d => Number(d.latency) || 0), 'Avg Latency (ms)', 'red');
   createBarChartById('uniqueUsersChart', labels, timeSeries.map(d => Number(d.unique_users) || 0), 'Unique Users', 'purple');
 
-  // model usage = pie
-  new Chart(document.getElementById('modelUsageChart'), {
-    type: 'pie',
-    data: {
-      labels: modelUsage.map(d => d.model_name || 'Unknown'),
-      datasets: [{ data: modelUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#007bff","#28a745","#ffc107","#dc3545","#6f42c1","#20c997"] }]
-    },
-    options: { responsive: true, maintainAspectRatio: false }
-  });
+  // Pie charts
+  new Chart(document.getElementById('modelUsageChart'), { type: 'pie', data: { labels: modelUsage.map(d => d.model_name || 'Unknown'), datasets: [{ data: modelUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#007bff","#28a745","#ffc107","#dc3545","#6f42c1","#20c997"] }] }, options: { responsive: true, maintainAspectRatio: false } });
+  new Chart(document.getElementById('providerUsageChart'), { type: 'pie', data: { labels: providerUsage.map(d => d.provider || 'Unknown'), datasets: [{ data: providerUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#17a2b8","#6c757d","#20c997","#fd7e14","#6f42c1"] }] }, options: { responsive: true, maintainAspectRatio: false } });
 
-  // provider usage = pie
-  new Chart(document.getElementById('providerUsageChart'), {
-    type: 'pie',
-    data: {
-      labels: providerUsage.map(d => d.provider || 'Unknown'),
-      datasets: [{ data: providerUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#17a2b8","#6c757d","#20c997","#fd7e14","#6f42c1"] }]
-    },
-    options: { responsive: true, maintainAspectRatio: false }
-  });
+  // Users tab
+  new Chart(document.getElementById('userRequestsChart'), { type: 'bar', data: { labels: userUsage.map(u => u.user__username || 'Anonymous'), datasets: [ { label: 'Requests', data: userUsage.map(u => Number(u.requests) || 0), backgroundColor: 'teal' }, { label: 'Cost ($)', data: userUsage.map(u => Number(u.cost) || 0), backgroundColor: 'orange' } ] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true }, y: { beginAtZero: true } } } });
 
-  // --- Users tab ---
-  new Chart(document.getElementById('userRequestsChart'), {
-    type: 'bar',
-    data: {
-      labels: userUsage.map(u => u.user__username || 'Unknown'),
-      datasets: [
-        { label: 'Requests', data: userUsage.map(u => Number(u.requests) || 0), backgroundColor: 'teal' },
-        { label: 'Cost ($)', data: userUsage.map(u => Number(u.cost) || 0), backgroundColor: 'orange' }
-      ]
-    },
-    options: Object.assign({}, defaultOptions, { indexAxis: 'y' })
-  });
-
-  // --- Errors: rate ---
-  const errorRateData = timeSeries.map(d => {
-    const req = Number(d.requests) || 0;
-    const err = Number(d.errors) || 0;
-    return req > 0 ? Number(((err / req) * 100).toFixed(2)) : 0;
-  });
+  // Error charts
+  const errorRateData = timeSeries.map(d => { const req = Number(d.requests) || 0; const err = Number(d.errors) || 0; return req > 0 ? Number(((err / req) * 100).toFixed(2)) : 0; });
   createBarChartById('errorRateChart', labels, errorRateData, 'Error Rate %', 'red');
+  new Chart(document.getElementById('errorProviderChart'), { type: 'bar', data: { labels: errorUsage.map(e => e.provider || 'Unknown'), datasets: [{ label: 'Errors', data: errorUsage.map(e => Number(e.errors) || 0), backgroundColor: 'crimson' }] }, options: Object.assign({}, defaultOptions, { indexAxis: errorUsage.length > 6 ? 'y' : 'x' }) });
 
-  // --- Errors: provider ---
-  new Chart(document.getElementById('errorProviderChart'), {
-    type: 'bar',
-    data: { labels: errorUsage.map(e => e.provider || 'Unknown'), datasets: [{ label: 'Errors', data: errorUsage.map(e => Number(e.errors) || 0), backgroundColor: 'crimson' }] },
-    options: Object.assign({}, defaultOptions, { indexAxis: errorUsage.length > 6 ? 'y' : 'x' })
-  });
-
-  // --- Errors: types (PIE CHART) ---
   (function renderErrorTypes() {
     const ctx = document.getElementById('errorTypesChart');
     if (!errorTypes || errorTypes.length === 0) {
-      new Chart(ctx, {
-        type: 'pie',
-        data: { labels: ['No errors'], datasets: [{ data: [0], backgroundColor: ['#ddd'] }] }
-      });
+      new Chart(ctx, { type: 'pie', data: { labels: ['No errors'], datasets: [{ data: [0], backgroundColor: ['#ddd'] }] } });
       return;
     }
-
     const labelsErr = errorTypes.map(e => e.error_message || 'Unknown');
     const countsErr = errorTypes.map(e => Number(e.count) || 0);
     const palette = ["#ff6384","#36a2eb","#ffce56","#9966ff","#ff9f40","#6f42c1","#20c997","#fd7e14"];
     const bgColors = countsErr.map((_, i) => palette[i % palette.length]);
-
-    new Chart(ctx, {
-      type: 'pie',
-      data: { labels: labelsErr, datasets: [{ data: countsErr, backgroundColor: bgColors }] },
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+    new Chart(ctx, { type: 'pie', data: { labels: labelsErr, datasets: [{ data: countsErr, backgroundColor: bgColors }] }, options: { responsive: true, maintainAspectRatio: false } });
   })();
 
-  // --- Cache ---
+  // Cache
   createBarChartById('cacheHitsChart', labels, timeSeries.map(d => Number(d.cache_hits) || 0), 'Cache Hits', 'purple');
 
-  // --- Feedback ---
-  createBarChartById('feedbackChart', feedback.map(d => {
-    try { return new Date(d.hour).toLocaleString(); } catch(_) { return d.hour || ''; }
-  }), feedback.map(d => Number(d.avg_feedback) || 0), 'Avg Feedback', 'blue');
+  // Feedback
+  createBarChartById('feedbackChart', feedback.map(d => { try { return new Date(d.hour).toLocaleString(); } catch(_) { return d.hour || ''; } }), feedback.map(d => Number(d.avg_feedback) || 0), 'Avg Feedback', 'blue');
 
-  // --- Metadata ---
-  new Chart(document.getElementById('modelUsageMetaChart'), {
-    type: 'doughnut',
-    data: { labels: modelUsage.map(d => d.model_name || 'Unknown'), datasets: [{ data: modelUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#007bff","#28a745","#ffc107","#dc3545","#6f42c1"] }] },
-    options: { responsive: true, maintainAspectRatio: false }
-  });
+  // Metadata
+  new Chart(document.getElementById('modelUsageMetaChart'), { type: 'doughnut', data: { labels: modelUsage.map(d => d.model_name || 'Unknown'), datasets: [{ data: modelUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#007bff","#28a745","#ffc107","#dc3545","#6f42c1"] }] }, options: { responsive: true, maintainAspectRatio: false } });
+  new Chart(document.getElementById('providerUsageMetaChart'), { type: 'doughnut', data: { labels: providerUsage.map(d => d.provider || 'Unknown'), datasets: [{ data: providerUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#17a2b8","#6c757d","#20c997","#fd7e14"] }] }, options: { responsive: true, maintainAspectRatio: false } });
 
-  new Chart(document.getElementById('providerUsageMetaChart'), {
-    type: 'doughnut',
-    data: { labels: providerUsage.map(d => d.provider || 'Unknown'), datasets: [{ data: providerUsage.map(d => Number(d.requests) || 0), backgroundColor: ["#17a2b8","#6c757d","#20c997","#fd7e14"] }] },
-    options: { responsive: true, maintainAspectRatio: false }
-  });
-
-}); // DOMContentLoaded
+});
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

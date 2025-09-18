@@ -6,7 +6,7 @@ client = Portkey(api_key=settings.PORTKEY_API_KEY)
 
 # Map models to providers
 MODEL_PROVIDERS = {
-    "@first-integrati-118ccf/gemini-2.5-pro": "google",
+    "@first-integrati-600395/gemini-2.5-pro": "google",
     "gpt-4": "openai",
     "gpt-3.5-turbo": "openai",
     "claude-3-opus-20240229": "anthropic",

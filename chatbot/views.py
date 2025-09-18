@@ -6,6 +6,7 @@ import time
 from .utils import client, get_available_models, get_provider
 import json
 from django.core.serializers.json import DjangoJSONEncoder
+from datetime import datetime, timedelta
 
 # Optional: simple cost calculation per 1k tokens
 def calculate_cost(tokens):
@@ -100,46 +101,57 @@ def chat_view(request):
     return render(request, "chat.html", context)
 
 
-import json
-from django.shortcuts import render
-from django.db.models import Count, Sum, Avg, Q
-from django.db.models.functions import TruncHour
-from django.core.serializers.json import DjangoJSONEncoder
-from .models import ChatLog
 
 def analytics_view(request):
+    # --- Filter handling ---
+    user_filter = request.GET.get("user")  # username
+    start_date = request.GET.get("start_date")
+    end_date = request.GET.get("end_date")
+
+    queryset = ChatLog.objects.all()
+
+    if user_filter:
+        queryset = queryset.filter(user__username=user_filter)
+    if start_date:
+        start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        queryset = queryset.filter(timestamp__gte=start_date)
+
+    if end_date:
+        end_date = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1) - timedelta(seconds=1)
+        queryset = queryset.filter(timestamp__lte=end_date)
+
     # --- Overview metrics ---
-    total_cost = ChatLog.objects.aggregate(total=Sum("cost"))["total"] or 0
-    total_tokens = ChatLog.objects.aggregate(total=Sum("tokens_used"))["total"] or 0
-    total_requests = ChatLog.objects.count()
-    unique_users = ChatLog.objects.values("user_id").distinct().count()
-    avg_latency = ChatLog.objects.aggregate(avg=Avg("latency"))["avg"] or 0
-    errors = ChatLog.objects.filter(~Q(error_message__isnull=True)).count()
+    total_cost = queryset.aggregate(total=Sum("cost"))["total"] or 0
+    total_tokens = queryset.aggregate(total=Sum("tokens_used"))["total"] or 0
+    total_requests = queryset.count()
+    unique_users = queryset.values("user_id").distinct().count()
+    avg_latency = queryset.aggregate(avg=Avg("latency"))["avg"] or 0
+    errors = queryset.filter(~Q(error_message__isnull=True)).count()
 
     # --- Requests per user ---
     user_usage = list(
-        ChatLog.objects.values("user__username")
+        queryset.values("user__username")
         .annotate(requests=Count("id"), cost=Sum("cost"))
         .order_by("-requests")
     )
 
     # --- Requests per model ---
     model_usage = list(
-        ChatLog.objects.values("model_name")
+        queryset.values("model_name")
         .annotate(requests=Count("id"))
         .order_by("-requests")
     )
 
     # --- Requests per provider ---
     provider_usage = list(
-        ChatLog.objects.values("provider")
+        queryset.values("provider")
         .annotate(requests=Count("id"))
         .order_by("-requests")
     )
 
     # --- Errors per provider ---
     error_usage = list(
-        ChatLog.objects.filter(~Q(error_message__isnull=True))
+        queryset.filter(~Q(error_message__isnull=True))
         .values("provider")
         .annotate(errors=Count("id"))
         .order_by("-errors")
@@ -147,15 +159,15 @@ def analytics_view(request):
 
     # --- Error types distribution ---
     error_types = list(
-        ChatLog.objects.filter(~Q(error_message__isnull=True))
+        queryset.filter(~Q(error_message__isnull=True))
         .values("error_message")
         .annotate(count=Count("id"))
         .order_by("-count")
     )
 
-    # --- Feedback trend (assuming response_text stores rating somewhere or extra model) ---
+    # --- Feedback trend ---
     feedback_trend = (
-        ChatLog.objects.annotate(hour=TruncHour("timestamp"))
+        queryset.annotate(hour=TruncHour("timestamp"))
         .values("hour")
         .annotate(avg_feedback=Avg("latency"))  # ⚠ replace with feedback field if exists
         .order_by("hour")
@@ -163,7 +175,7 @@ def analytics_view(request):
 
     # --- Time-series (hourly stats) ---
     time_series = (
-        ChatLog.objects.annotate(hour=TruncHour("timestamp"))
+        queryset.annotate(hour=TruncHour("timestamp"))
         .values("hour")
         .annotate(
             requests=Count("id"),
@@ -176,7 +188,16 @@ def analytics_view(request):
         .order_by("hour")
     )
 
+    # --- All usernames for filter dropdown ---
+    all_users = ChatLog.objects.values_list("user__username", flat=True).distinct().order_by("user__username")
+
     context = {
+        # Filters
+        "all_users": all_users,
+        "selected_user": user_filter,
+        "start_date": start_date,
+        "end_date": end_date,
+
         # Summary
         "total_cost": round(total_cost, 4),
         "total_tokens": total_tokens,
@@ -191,7 +212,7 @@ def analytics_view(request):
         "model_usage_json": json.dumps(list(model_usage), cls=DjangoJSONEncoder),
         "provider_usage_json": json.dumps(list(provider_usage), cls=DjangoJSONEncoder),
         "error_usage_json": json.dumps(list(error_usage), cls=DjangoJSONEncoder),
-        "error_types_json": json.dumps(list(error_types), cls=DjangoJSONEncoder), 
+        "error_types_json": json.dumps(list(error_types), cls=DjangoJSONEncoder),
         "feedback_json": json.dumps(list(feedback_trend), cls=DjangoJSONEncoder),
     }
     return render(request, "chatlog_analytics.html", context)
