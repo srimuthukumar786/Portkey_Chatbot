@@ -14,3 +14,7 @@ This project integrates multiple LLM models using Portkey.ai and provides analyt
 3. Install dependencies:
    ```bash
    pip install -r requirements.txt
+4.Signin in portkey.ai
+5.Integrate LLM model with API_Key
+6.Copy that API_Key and paste it in settings.py
+7.Run the project
